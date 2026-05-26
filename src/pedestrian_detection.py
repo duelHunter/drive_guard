@@ -69,9 +69,13 @@ class PedestrianDetection:
                 padding=(8, 8),
                 scale=scale_factor
             )
+            # Filter by confidence weight — keeps only high-confidence detections
+            if len(detections) > 0:
+                detections = [d for d, w in zip(detections, weights)
+                              if w >= config.PED_CONFIDENCE_THRESHOLD]
         else:
             detections = self._custom_detect(roi_image, scale_factor)
-        
+
         # Adjust for ROI offset
         if use_roi:
             detections = [(x, y + roi_offset[1], w, h) for x, y, w, h in detections]
