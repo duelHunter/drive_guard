@@ -246,13 +246,13 @@ class VehicleWarningPipeline:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         # Process 1 frame per second — skip the rest
-        process_interval = max(1, fps * 2)
+        process_interval = max(1, fps) # Process every N frames to achieve ~1 FPS
         processed_count = 0
 
         print(f"Processing video: {video_path}")
         print(f"Resolution: {width}x{height}, FPS: {fps}, Total frames: {total_frames}")
-        print(f"Sampling: 1 frame every {process_interval} frames (1 per 2 seconds)\n")
-
+        print(f"Sampling: 1 frame every {process_interval} frames (1 per second)\n")
+            
         # Setup output video
         out = None
         if output_path:

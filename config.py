@@ -105,7 +105,7 @@ NMS_OVERLAP_THRESHOLD = 0.3  # IoU threshold for merging overlapping boxes
 # Filters detections by the SVM weight returned by detectMultiScale.
 # Higher value = fewer but more confident detections (reduces false positives).
 # Typical range: 0.5 (loose) → 1.5 (strict)
-PED_CONFIDENCE_THRESHOLD = 1.0
+PED_CONFIDENCE_THRESHOLD = 1.2
 
 # Search region optimization (restrict to lower portion of frame)
 # Detect pedestrians only in lower 2/3 of frame
