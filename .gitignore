@@ -1,1 +1,54 @@
 Computer_vision_proposal.pdf
+my_points.md
+
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Trained models (large binary files)
+models/*.pkl
+models/*.joblib
+
+# Datasets (large, download separately)
+data/datasets/
+
+# Test videos (large)
+data/videos/
+
+# Generated output
+output/
+
+# Logs
+*.log
+
+# Video files anywhere in the project
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.idea/
+.vscode/
+*.suo
+*.user
+
+# Python packaging artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/

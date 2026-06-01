@@ -159,7 +159,7 @@ PEDESTRIAN_BOX_COLOR = (0, 0, 255)  # Red for pedestrians
 ZEBRA_BOX_COLOR = (255, 0, 0)  # Cyan for zebra crossing
 
 # Font settings
-FONT = cv2.FONT_HERSHEY_SIMPLEX
+FONT = 0  # cv2.FONT_HERSHEY_SIMPLEX
 FONT_SCALE = 0.6
 FONT_THICKNESS = 2
 FONT_COLOR = (255, 255, 255)  # White text
@@ -187,8 +187,3 @@ ALERT_VOLUME = 0.7
 LOG_LEVEL = 'INFO'  # 'DEBUG', 'INFO', 'WARNING', 'ERROR'
 LOG_FILE = 'output/system.log'
 
-# Import OpenCV for visualization color constants
-try:
-    import cv2
-except ImportError:
-    pass
