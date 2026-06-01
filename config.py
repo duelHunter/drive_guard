@@ -6,10 +6,10 @@ Configuration file for the Vision-Based Vehicle Warning System
 # VIDEO INPUT SETTINGS
 # ============================================================================
 VIDEO_FPS = 15  # Target processing frame rate
-FRAME_WIDTH = 640
-FRAME_HEIGHT = 360
-# FRAME_WIDTH = 1280
-# FRAME_HEIGHT = 720
+# FRAME_WIDTH = 640
+# FRAME_HEIGHT = 360
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
 
 # Rolling buffer for temporal smoothing (in frames)
 DETECTION_BUFFER_SIZE = 30  # ~2 seconds at 15 FPS
