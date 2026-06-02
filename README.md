@@ -129,6 +129,3 @@ See `config.py` for tunable parameters:
 [4] N. Dalal and B. Triggs, "Histograms of oriented gradients for human detection," CVPR, 2005.
 [5] P. Viola and M. Jones, "Rapid object detection using a boosted cascade of simple features," CVPR, 2001.
 
-## License
-
-Academic use only (University of Ruhuna, EE7204/EC7205)
