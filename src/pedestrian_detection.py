@@ -20,7 +20,7 @@ class PedestrianDetection:
     
     def __init__(self):
         """Initialize pedestrian detector"""
-        self.hog = cv2.HOGDescriptor((64, 128), (16, 16), (8, 8), (8, 8), 9)
+        self.hog = cv2.HOGDescriptor()
         
         # Try to use pre-trained detector, otherwise use custom
         self.use_pretrained = True
@@ -65,10 +65,9 @@ class PedestrianDetection:
         if self.use_pretrained:
             detections, weights = self.hog.detectMultiScale(
                 roi_image,
-                winStride=(8, 8),
-                padding=(16, 16),
-                scale=scale_factor,
-                hitThreshold=0
+                winStride=(4, 4),
+                padding=(8, 8),
+                scale=scale_factor
             )
         else:
             detections = self._custom_detect(roi_image, scale_factor)

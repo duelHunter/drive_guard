@@ -106,7 +106,7 @@ PED_CONFIDENCE_THRESHOLD = 0.5
 
 # Search region optimization (restrict to lower portion of frame)
 # Detect pedestrians only in lower 2/3 of frame
-PED_SEARCH_REGION = (0, int(FRAME_HEIGHT * 2/3), FRAME_WIDTH, FRAME_HEIGHT)
+PED_SEARCH_REGION = (0, 0, FRAME_WIDTH, FRAME_HEIGHT)  # full frame
 
 # ============================================================================
 # ZEBRA CROSSING DETECTION SETTINGS (Optional)

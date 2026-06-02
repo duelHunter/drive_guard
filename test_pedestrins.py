@@ -3,7 +3,7 @@ import cv2
 # Load image
 # image = cv2.imread("data/signboard.jpg")
 # image = cv2.imread("data/signboard.png")
-image = cv2.imread("data/peds5.jpg")
+image = cv2.imread("data/original.jpg")
 
 # Create HOG descriptor
 hog = cv2.HOGDescriptor()
