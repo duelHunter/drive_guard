@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import sys
 import os
+import time
 from typing import Dict, List, Tuple
 import argparse
 from pathlib import Path
@@ -176,9 +177,16 @@ class VehicleWarningPipeline:
             frame = self.visualizer.draw_alert_message(frame, results['alert_message'], has_alert)
         
         # Add FPS counter
-        cv2.putText(frame, f"Frame: {self.warning_system.frame_counter}", 
+        cv2.putText(frame, f"Frame: {self.warning_system.frame_counter}",
                    (10, 30), config.FONT, 0.7, (255, 255, 255), 2)
-        
+
+        return frame
+
+    def _draw_latency(self, frame: np.ndarray, latency_ms: float) -> np.ndarray:
+        """Overlay latency and FPS on the frame."""
+        fps = 1000.0 / latency_ms if latency_ms > 0 else 0
+        text = f"Latency: {latency_ms:.1f} ms  |  FPS: {fps:.1f}"
+        cv2.putText(frame, text, (10, 60), config.FONT, 0.7, (0, 255, 255), 2)
         return frame
     
     def process_video(self, video_path: str, output_path: str = None, display: bool = True):
@@ -222,29 +230,31 @@ class VehicleWarningPipeline:
                 
                 # Resize frame to target size
                 frame = cv2.resize(frame, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
-                
-                # Process frame
+
+                # Process frame with latency measurement
+                t0 = time.perf_counter()
                 results = self.process_frame(frame)
-                
+                latency_ms = (time.perf_counter() - t0) * 1000
+
+                print(f"Frame {frame_count + 1:>5} | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
+
                 # Visualize
                 annotated_frame = self.visualize_results(results)
-                
+                annotated_frame = self._draw_latency(annotated_frame, latency_ms)
+
                 # Display
                 if display:
                     cv2.imshow("Vehicle Warning System", annotated_frame)
                     key = cv2.waitKey(1)
                     if key == ord('q'):
                         break
-                
+
                 # Write output
                 if out:
-                    # Resize back to original
                     output_frame = cv2.resize(annotated_frame, (width, height))
                     out.write(output_frame)
-                
+
                 frame_count += 1
-                if frame_count % 30 == 0:
-                    print(f"Processed {frame_count}/{total_frames} frames...")
         
         finally:
             cap.release()
@@ -254,6 +264,69 @@ class VehicleWarningPipeline:
             
             print(f"Video processing completed! Total frames: {frame_count}")
     
+    def process_camera(self, camera_index: int = 0, output_path: str = None, display: bool = True):
+        """
+        Process live camera feed in real-time.
+
+        Args:
+            camera_index: Camera device index (0 = default webcam/dashcam)
+            output_path: Optional path to save the output video
+            display: Whether to show the live window
+        """
+        cap = cv2.VideoCapture(camera_index)
+        if not cap.isOpened():
+            print(f"Error: Cannot open camera {camera_index}")
+            return
+
+        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Camera {camera_index} opened — {width}x{height}")
+        print("Press 'q' to quit.\n")
+
+        out = None
+        if output_path:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, 15, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
+            print(f"Recording to: {output_path}")
+
+        frame_count = 0
+
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    print("Error: Failed to grab frame.")
+                    break
+
+                frame = cv2.resize(frame, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
+
+                # Process with latency measurement
+                t0 = time.perf_counter()
+                results = self.process_frame(frame)
+                latency_ms = (time.perf_counter() - t0) * 1000
+
+                print(f"Frame {frame_count + 1:>5} | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
+
+                annotated_frame = self.visualize_results(results)
+                annotated_frame = self._draw_latency(annotated_frame, latency_ms)
+
+                if display:
+                    cv2.imshow("Vehicle Warning System — Live", annotated_frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+                if out:
+                    out.write(annotated_frame)
+
+                frame_count += 1
+
+        finally:
+            cap.release()
+            if out:
+                out.release()
+            cv2.destroyAllWindows()
+            print(f"\nCamera session ended. Total frames processed: {frame_count}")
+
     def process_image(self, image_path: str) -> np.ndarray:
         """
         Process single image
@@ -269,15 +342,17 @@ class VehicleWarningPipeline:
             print(f"Error: Cannot load image {image_path}")
             return None
         
-        # Resize
         image = cv2.resize(image, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
-        
-        # Process
+
+        t0 = time.perf_counter()
         results = self.process_frame(image)
-        
-        # Visualize
+        latency_ms = (time.perf_counter() - t0) * 1000
+
+        print(f"Latency: {latency_ms:.1f} ms | FPS equivalent: {1000/latency_ms:.1f}")
+
         annotated = self.visualize_results(results)
-        
+        annotated = self._draw_latency(annotated, latency_ms)
+
         return annotated
 
 
@@ -286,21 +361,23 @@ def main():
     parser = argparse.ArgumentParser(description="Vehicle Warning System")
     parser.add_argument('--video', type=str, help='Path to input video')
     parser.add_argument('--image', type=str, help='Path to input image')
+    parser.add_argument('--camera', type=int, nargs='?', const=0, metavar='INDEX',
+                        help='Run on live camera feed (default index: 0)')
     parser.add_argument('--output', type=str, help='Path to output video/image')
-    parser.add_argument('--no-display', action='store_true', help='Disable display')
+    parser.add_argument('--no-display', action='store_true', help='Disable display window')
     parser.add_argument('--no-zebra', action='store_true', help='Disable zebra crossing detection')
     parser.add_argument('--no-tracking', action='store_true', help='Disable tracking')
-    
+
     args = parser.parse_args()
-    
-    # Initialize pipeline
+
     pipeline = VehicleWarningPipeline(
         enable_zebra=not args.no_zebra,
         enable_tracking=not args.no_tracking
     )
-    
-    # Process input
-    if args.video:
+
+    if args.camera is not None:
+        pipeline.process_camera(args.camera, args.output, not args.no_display)
+    elif args.video:
         pipeline.process_video(args.video, args.output, not args.no_display)
     elif args.image:
         result = pipeline.process_image(args.image)
@@ -312,7 +389,7 @@ def main():
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
     else:
-        print("Please provide --video or --image argument")
+        print("Please provide --video, --image, or --camera argument")
         parser.print_help()
 
 
