@@ -210,25 +210,34 @@ class VehicleWarningPipeline:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
+        # Process 1 frame per second — skip the rest
+        process_interval = max(1, fps)
+        processed_count = 0
+
         print(f"Processing video: {video_path}")
         print(f"Resolution: {width}x{height}, FPS: {fps}, Total frames: {total_frames}")
-        
+        print(f"Sampling: 1 frame every {process_interval} frames (1 per second)\n")
+
         # Setup output video
         out = None
         if output_path:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            out = cv2.VideoWriter(output_path, fourcc, 1, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
             print(f"Output will be saved to: {output_path}")
-        
+
         frame_count = 0
-        
+
         try:
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
-                
-                # Resize frame to target size
+
+                # Only process every Nth frame
+                if frame_count % process_interval != 0:
+                    frame_count += 1
+                    continue
+
                 frame = cv2.resize(frame, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
 
                 # Process frame with latency measurement
@@ -236,7 +245,8 @@ class VehicleWarningPipeline:
                 results = self.process_frame(frame)
                 latency_ms = (time.perf_counter() - t0) * 1000
 
-                print(f"Frame {frame_count + 1:>5} | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
+                processed_count += 1
+                print(f"Second {processed_count:>4} (frame {frame_count:>5}) | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
 
                 # Visualize
                 annotated_frame = self.visualize_results(results)
@@ -245,14 +255,12 @@ class VehicleWarningPipeline:
                 # Display
                 if display:
                     cv2.imshow("Vehicle Warning System", annotated_frame)
-                    key = cv2.waitKey(1)
-                    if key == ord('q'):
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
 
                 # Write output
                 if out:
-                    output_frame = cv2.resize(annotated_frame, (width, height))
-                    out.write(output_frame)
+                    out.write(annotated_frame)
 
                 frame_count += 1
         
@@ -262,7 +270,7 @@ class VehicleWarningPipeline:
                 out.release()
             cv2.destroyAllWindows()
             
-            print(f"Video processing completed! Total frames: {frame_count}")
+            print(f"\nVideo processing completed! Frames read: {frame_count} | Frames processed: {processed_count}")
     
     def process_camera(self, camera_index: int = 0, output_path: str = None, display: bool = True):
         """

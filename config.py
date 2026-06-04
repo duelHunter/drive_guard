@@ -73,7 +73,7 @@ ROI_SIZE = 64  # 64x64 or 96x96
 TEMPLATE_THRESHOLD = 0.7
 
 # HOG+SVM classification threshold
-SVM_CONFIDENCE_THRESHOLD = 0.6
+SVM_CONFIDENCE_THRESHOLD = 0.8
 
 # HOG descriptor parameters
 HOG_CELL_SIZE = 8
