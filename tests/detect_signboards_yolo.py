@@ -18,10 +18,10 @@ model = YOLO("yolov8n.pt")
 # Input source
 # -----------------------------
 # Webcam / dashcam
-cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(0)
 
 # For video file, use this instead:
-# cap = cv2.VideoCapture("dashcam.mp4")
+cap = cv2.VideoCapture("data/videos/dashcam_footage_3.mp4")
 
 
 # COCO class names
