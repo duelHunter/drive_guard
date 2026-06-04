@@ -21,6 +21,7 @@ from pedestrian_detection import PedestrianDetection
 from warning_system import WarningSystem, Visualizer
 from zebra_crossing import ZebraCrossingDetector
 from tracking import MultiTracker
+from road_segmentation import RoadSegmenter
 
 
 class VehicleWarningPipeline:
@@ -28,32 +29,40 @@ class VehicleWarningPipeline:
     Main pipeline for vehicle warning system
     """
     
-    def __init__(self, enable_zebra: bool = True, enable_tracking: bool = True):
+    def __init__(self, enable_zebra: bool = True, enable_tracking: bool = True,
+                 enable_road_seg: bool = True):
         """
         Initialize pipeline
-        
+
         Args:
             enable_zebra: Enable zebra crossing detection
             enable_tracking: Enable tracking for temporal stability
+            enable_road_seg: Enable road segmentation for pedestrian context
         """
         print("Initializing Vehicle Warning System...")
-        
-        # Initialize modules
+
         self.preprocessor = ImagePreprocessor()
         self.sign_detector = TrafficSignDetector()
         self.sign_classifier = HOGSignClassifier()
         self.pedestrian_detector = PedestrianDetection()
         self.warning_system = WarningSystem()
         self.visualizer = Visualizer()
-        
-        # Optional modules
+
         self.zebra_detector = ZebraCrossingDetector() if enable_zebra else None
         self.pedestrian_tracker = MultiTracker() if enable_tracking else None
         self.sign_tracker = MultiTracker() if enable_tracking else None
-        
+
         self.enable_zebra = enable_zebra
         self.enable_tracking = enable_tracking
-        
+
+        # Road segmentation (optional — requires torch + transformers)
+        self.road_segmenter = None
+        if enable_road_seg:
+            try:
+                self.road_segmenter = RoadSegmenter()
+            except ImportError as e:
+                print(f"  [Warning] Road segmentation disabled: {e}")
+
         print("Pipeline initialized successfully!")
     
     def process_frame(self, frame: np.ndarray) -> Dict:
@@ -98,10 +107,18 @@ class VehicleWarningPipeline:
         # Apply tracking if enabled
         if self.enable_tracking and self.pedestrian_tracker:
             tracked = self.pedestrian_tracker.update(pedestrians)
-            results['detections']['pedestrian'] = list(tracked.values())
-        else:
-            results['detections']['pedestrian'] = pedestrians
-        
+            pedestrians = list(tracked.values())
+
+        results['detections']['pedestrian'] = pedestrians
+
+        # Step 3b: Road segmentation — classify pedestrians as on-road / off-road
+        if self.road_segmenter is not None:
+            road_mask = self.road_segmenter.get_road_mask(frame)
+            results['road_mask'] = road_mask
+            on_road, off_road = self.road_segmenter.classify_pedestrians(pedestrians, road_mask)
+            results['detections']['pedestrian_on_road'] = on_road
+            results['detections']['pedestrian_off_road'] = off_road
+
         # Step 4: Detect zebra crossings (optional)
         if self.enable_zebra and self.zebra_detector:
             gray = self.preprocessor.convert_to_gray(denoised)
@@ -146,8 +163,14 @@ class VehicleWarningPipeline:
         Returns:
             Flattened detection dict
         """
+        # When road segmentation is active, only on-road pedestrians trigger alerts
+        if 'pedestrian_on_road' in nested_detections:
+            ped_for_alert = nested_detections.get('pedestrian_on_road', [])
+        else:
+            ped_for_alert = nested_detections.get('pedestrian', [])
+
         flat = {
-            'pedestrian': nested_detections.get('pedestrian', []),
+            'pedestrian': ped_for_alert,
             'stop_sign': nested_detections.get('signs', {}).get('Stop', []),
             'speed_limit': nested_detections.get('signs', {}).get('Speed_Limit', []),
             'yield_sign': nested_detections.get('signs', {}).get('Yield', []),
@@ -166,10 +189,22 @@ class VehicleWarningPipeline:
             Annotated frame
         """
         frame = results['frame'].copy()
-        
-        # Draw detections
+
+        # Road overlay (drawn first so boxes render on top)
+        if 'road_mask' in results and self.road_segmenter is not None:
+            frame = self.road_segmenter.create_overlay(frame, results['road_mask'])
+
+        # Build detection dict for the visualizer.
+        # When road segmentation is active, replace the plain 'pedestrian' key
+        # with the colour-coded on-road / off-road split.
         flat_detections = self._flatten_detections(results['detections'])
-        frame = self.visualizer.draw_detections(frame, flat_detections, results['risk_scores'])
+        vis_detections = dict(flat_detections)
+        if 'pedestrian_on_road' in results['detections']:
+            vis_detections.pop('pedestrian', None)
+            vis_detections['pedestrian_on_road']  = results['detections']['pedestrian_on_road']
+            vis_detections['pedestrian_off_road'] = results['detections']['pedestrian_off_road']
+
+        frame = self.visualizer.draw_detections(frame, vis_detections, results['risk_scores'])
         
         # Draw alert message
         if results['alert_message']:
@@ -211,12 +246,12 @@ class VehicleWarningPipeline:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         # Process 1 frame per second — skip the rest
-        process_interval = max(1, fps)
+        process_interval = max(1, fps * 2)
         processed_count = 0
 
         print(f"Processing video: {video_path}")
         print(f"Resolution: {width}x{height}, FPS: {fps}, Total frames: {total_frames}")
-        print(f"Sampling: 1 frame every {process_interval} frames (1 per second)\n")
+        print(f"Sampling: 1 frame every {process_interval} frames (1 per 2 seconds)\n")
 
         # Setup output video
         out = None
@@ -246,7 +281,7 @@ class VehicleWarningPipeline:
                 latency_ms = (time.perf_counter() - t0) * 1000
 
                 processed_count += 1
-                print(f"Second {processed_count:>4} (frame {frame_count:>5}) | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
+                print(f"Sample {processed_count:>4} (frame {frame_count:>5}) | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
 
                 # Visualize
                 annotated_frame = self.visualize_results(results)
@@ -375,12 +410,14 @@ def main():
     parser.add_argument('--no-display', action='store_true', help='Disable display window')
     parser.add_argument('--no-zebra', action='store_true', help='Disable zebra crossing detection')
     parser.add_argument('--no-tracking', action='store_true', help='Disable tracking')
+    parser.add_argument('--no-road', action='store_true', help='Disable road segmentation')
 
     args = parser.parse_args()
 
     pipeline = VehicleWarningPipeline(
         enable_zebra=not args.no_zebra,
-        enable_tracking=not args.no_tracking
+        enable_tracking=not args.no_tracking,
+        enable_road_seg=not args.no_road
     )
 
     if args.camera is not None:
