@@ -164,11 +164,12 @@ class Visualizer:
         # Colors for different detection types
         colors = {
             'pedestrian': config.PEDESTRIAN_BOX_COLOR,
-            'pedestrian_on_road':  (0, 0, 255),    # Red  — danger
+            'pedestrian_on_road':  (0, 0, 255),    # Red   — danger
             'pedestrian_off_road': (0, 255, 0),    # Green — safe
-            'stop_sign': (0, 0, 255),
-            'speed_limit': (0, 165, 255),
-            'yield_sign': (0, 255, 255),
+            'stop_sign':     (0, 0, 255),           # Red
+            'traffic_light': (0, 255, 255),         # Yellow
+            'speed_limit':   (0, 165, 255),         # Orange
+            'yield_sign':    (0, 255, 255),          # Yellow
             'zebra_crossing': config.ZEBRA_BOX_COLOR,
         }
         

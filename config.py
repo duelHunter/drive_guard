@@ -75,6 +75,10 @@ TEMPLATE_THRESHOLD = 0.7
 # HOG+SVM classification threshold
 SVM_CONFIDENCE_THRESHOLD = 0.8
 
+# YOLO sign detection
+YOLO_SIGN_MODEL = "yolov8n.pt"
+YOLO_SIGN_CONFIDENCE = 0.35
+
 # HOG descriptor parameters
 HOG_CELL_SIZE = 8
 HOG_BLOCK_SIZE = 2  # blocks per side

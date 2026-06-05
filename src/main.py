@@ -22,6 +22,7 @@ from warning_system import WarningSystem, Visualizer
 from zebra_crossing import ZebraCrossingDetector
 from tracking import MultiTracker
 from road_segmentation import RoadSegmenter
+from sign_detection_yolo import YOLOSignDetector
 
 
 class VehicleWarningPipeline:
@@ -30,7 +31,7 @@ class VehicleWarningPipeline:
     """
     
     def __init__(self, enable_zebra: bool = True, enable_tracking: bool = True,
-                 enable_road_seg: bool = True):
+                 enable_road_seg: bool = True, enable_yolo_signs: bool = True):
         """
         Initialize pipeline
 
@@ -62,6 +63,17 @@ class VehicleWarningPipeline:
                 self.road_segmenter = RoadSegmenter()
             except ImportError as e:
                 print(f"  [Warning] Road segmentation disabled: {e}")
+
+        # YOLO sign detection (optional — requires ultralytics)
+        self.yolo_sign_detector = None
+        if enable_yolo_signs:
+            try:
+                self.yolo_sign_detector = YOLOSignDetector(
+                    model_path=config.YOLO_SIGN_MODEL,
+                    confidence=config.YOLO_SIGN_CONFIDENCE
+                )
+            except ImportError as e:
+                print(f"  [Warning] YOLO sign detection disabled: {e}")
 
         print("Pipeline initialized successfully!")
     
@@ -100,7 +112,12 @@ class VehicleWarningPipeline:
                 )
         
         results['detections']['signs'] = classified_signs
-        
+
+        # Step 2b: YOLO sign detection — merges into detections alongside HOG signs
+        if self.yolo_sign_detector is not None:
+            yolo_signs = self.yolo_sign_detector.detect(frame)
+            results['detections']['yolo_signs'] = yolo_signs
+
         # Step 3: Detect pedestrians
         pedestrians = self.pedestrian_detector.detect(frame, use_roi=True)
         
@@ -163,18 +180,20 @@ class VehicleWarningPipeline:
         Returns:
             Flattened detection dict
         """
-        # When road segmentation is active, only on-road pedestrians trigger alerts
         if 'pedestrian_on_road' in nested_detections:
             ped_for_alert = nested_detections.get('pedestrian_on_road', [])
         else:
             ped_for_alert = nested_detections.get('pedestrian', [])
 
+        yolo = nested_detections.get('yolo_signs', {})
+
         flat = {
-            'pedestrian': ped_for_alert,
-            'stop_sign': nested_detections.get('signs', {}).get('Stop', []),
-            'speed_limit': nested_detections.get('signs', {}).get('Speed_Limit', []),
-            'yield_sign': nested_detections.get('signs', {}).get('Yield', []),
-            'zebra_crossing': nested_detections.get('zebra_crossing', [])
+            'pedestrian':    ped_for_alert,
+            'stop_sign':     nested_detections.get('signs', {}).get('Stop', []) + yolo.get('stop_sign', []),
+            'traffic_light': yolo.get('traffic_light', []),
+            'speed_limit':   nested_detections.get('signs', {}).get('Speed_Limit', []),
+            'yield_sign':    nested_detections.get('signs', {}).get('Yield', []),
+            'zebra_crossing': nested_detections.get('zebra_crossing', []),
         }
         return flat
     
@@ -411,13 +430,15 @@ def main():
     parser.add_argument('--no-zebra', action='store_true', help='Disable zebra crossing detection')
     parser.add_argument('--no-tracking', action='store_true', help='Disable tracking')
     parser.add_argument('--no-road', action='store_true', help='Disable road segmentation')
+    parser.add_argument('--no-yolo-signs', action='store_true', help='Disable YOLO sign detection')
 
     args = parser.parse_args()
 
     pipeline = VehicleWarningPipeline(
         enable_zebra=not args.no_zebra,
         enable_tracking=not args.no_tracking,
-        enable_road_seg=not args.no_road
+        enable_road_seg=not args.no_road,
+        enable_yolo_signs=not args.no_yolo_signs
     )
 
     if args.camera is not None:
