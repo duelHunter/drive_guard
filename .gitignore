@@ -19,7 +19,7 @@ models/*.joblib
 data/datasets/
 
 # Test videos (large)
-data/videos/
+# data/videos/
 
 # Generated output
 output/
@@ -28,7 +28,7 @@ output/
 *.log
 
 # Video files anywhere in the project
-*.mp4
+# *.mp4
 *.avi
 *.mov
 *.mkv
