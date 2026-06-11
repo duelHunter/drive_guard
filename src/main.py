@@ -96,7 +96,7 @@ class VehicleWarningPipeline:
         }
         
         # Step 1: Preprocessing
-        denoised, hsv = self.preprocessor.preprocess_frame(frame, apply_clahe=True)
+        _, hsv = self.preprocessor.preprocess_frame(frame, apply_clahe=True)
         
         # Step 2: Detect and classify traffic signs
         sign_candidates = self.sign_detector.detect_all_signs(hsv, frame)
@@ -138,8 +138,7 @@ class VehicleWarningPipeline:
 
         # Step 4: Detect zebra crossings (optional)
         if self.enable_zebra and self.zebra_detector:
-            gray = self.preprocessor.convert_to_gray(denoised)
-            crossings = self.zebra_detector.detect(frame, gray)
+            crossings = self.zebra_detector.detect(frame)
             if crossings:
                 # Convert to (x, y, w, h) format
                 zebra_boxes = []

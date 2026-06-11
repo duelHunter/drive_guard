@@ -123,16 +123,9 @@ PED_SEARCH_REGION = (0, 0, FRAME_WIDTH, FRAME_HEIGHT)  # full frame
 CANNY_THRESHOLD1 = 50
 CANNY_THRESHOLD2 = 150
 
-# Hough line transform
-HOUGH_RHO = 1
-HOUGH_THETA = 1  # degrees
-HOUGH_THRESHOLD = 20  # Minimum votes
-HOUGH_MIN_LENGTH = 50
-HOUGH_MAX_GAP = 10
-
-# Stripe periodicity parameters
-MIN_PARALLEL_LINES = 3  # Minimum number of parallel stripes
-LINE_ANGLE_TOLERANCE = 5  # degrees, for parallel detection
+# YOLOv8 crosswalk detector (ONNX export, single class "crosswalk")
+ZEBRA_YOLO_MODEL = "models/crosswalk_yolov8.onnx"
+ZEBRA_YOLO_CONFIDENCE = 0.35
 
 # ============================================================================
 # KALMAN FILTER TRACKING (Optional)
