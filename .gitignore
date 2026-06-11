@@ -55,3 +55,6 @@ build/
 
 # yolov8 pt files
 *.pt
+
+# ONNX model weights (large binary files)
+*.onnx
