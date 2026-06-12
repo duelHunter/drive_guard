@@ -258,27 +258,31 @@ class VehicleWarningPipeline:
             return
         
         # Get video properties
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        # Process 1 frame per second — skip the rest
-        process_interval = max(1, fps) # Process every N frames to achieve ~1 FPS
+
+        # Run the full detection pipeline once per second; every other
+        # frame re-uses the latest result so playback stays smooth.
+        process_interval = max(1, fps)
+        frame_delay_ms = max(1, int(1000 / fps))
         processed_count = 0
 
         print(f"Processing video: {video_path}")
         print(f"Resolution: {width}x{height}, FPS: {fps}, Total frames: {total_frames}")
         print(f"Sampling: 1 frame every {process_interval} frames (1 per second)\n")
-            
+
         # Setup output video
         out = None
         if output_path:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_path, fourcc, 1, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
+            out = cv2.VideoWriter(output_path, fourcc, fps, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
             print(f"Output will be saved to: {output_path}")
 
         frame_count = 0
+        last_results = None
+        last_latency_ms = 0.0
 
         try:
             while True:
@@ -286,29 +290,28 @@ class VehicleWarningPipeline:
                 if not ret:
                     break
 
-                # Only process every Nth frame
-                if frame_count % process_interval != 0:
-                    frame_count += 1
-                    continue
-
                 frame = cv2.resize(frame, (config.FRAME_WIDTH, config.FRAME_HEIGHT))
 
-                # Process frame with latency measurement
-                t0 = time.perf_counter()
-                results = self.process_frame(frame)
-                latency_ms = (time.perf_counter() - t0) * 1000
+                # Run detection once per second
+                if frame_count % process_interval == 0:
+                    t0 = time.perf_counter()
+                    last_results = self.process_frame(frame)
+                    last_latency_ms = (time.perf_counter() - t0) * 1000
 
-                processed_count += 1
-                print(f"Sample {processed_count:>4} (frame {frame_count:>5}) | Latency: {latency_ms:6.1f} ms | FPS: {1000/latency_ms:5.1f}")
+                    processed_count += 1
+                    print(f"Sample {processed_count:>4} (frame {frame_count:>5}) | Latency: {last_latency_ms:6.1f} ms | FPS: {1000/last_latency_ms:5.1f}")
 
-                # Visualize
-                annotated_frame = self.visualize_results(results)
-                annotated_frame = self._draw_latency(annotated_frame, latency_ms)
+                # Draw the latest detections on the current frame
+                if last_results is not None:
+                    annotated_frame = self.visualize_results(dict(last_results, frame=frame))
+                else:
+                    annotated_frame = frame
+                annotated_frame = self._draw_latency(annotated_frame, last_latency_ms)
 
                 # Display
                 if display:
                     cv2.imshow("Vehicle Warning System", annotated_frame)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    if cv2.waitKey(frame_delay_ms) & 0xFF == ord('q'):
                         break
 
                 # Write output
@@ -316,7 +319,7 @@ class VehicleWarningPipeline:
                     out.write(annotated_frame)
 
                 frame_count += 1
-        
+
         finally:
             cap.release()
             if out:
